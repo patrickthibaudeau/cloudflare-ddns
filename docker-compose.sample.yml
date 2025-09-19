@@ -1,0 +1,80 @@
+# Sample docker-compose configuration for Cloudflare DDNS Updater
+# Copy to docker-compose.yml and adjust as needed.
+# You can configure variables inline under `environment:` OR comment that out and
+# use an external .env file via `env_file:`. (You can also use both; env_file is
+# loaded first, then inline environment overrides.)
+
+services:
+  ddns:
+    # Option 1: Build from local Dockerfile
+    build: .
+    # Option 2: Use a pre-built image (uncomment and adjust tag if pushing to a registry)
+    # image: your-registry.example.com/cf-ddns:latest
+
+    container_name: cf-ddns
+    restart: unless-stopped
+    # Uncomment to pin resource usage (example limits)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.25'
+    #       memory: 128M
+
+    # Networking: usually no ports needed (outbound only)
+    # networks:
+    #   - default
+
+    # Option A: Inline environment variables
+    environment:
+      # Choose ONE auth method: API Token (preferred) OR (Email + Global API Key)
+      # CLOUDFLARE_API_TOKEN: "replace_me"
+      # CLOUDFLARE_EMAIL: "you@example.com"
+      # CLOUDFLARE_API_KEY: ""
+
+      # Single zone + multiple records example
+      # CLOUDFLARE_ZONE_NAME: "example.com"
+      # CLOUDFLARE_RECORD_NAMES: "example.com,home.example.com,office.example.com"
+
+      # Or multi-zone example
+      # CLOUDFLARE_ZONE_NAMES: "example.com,example.net"
+      # CLOUDFLARE_RECORD_NAMES: "home.example.com,office.example.net"
+
+      # Common options
+      # CLOUDFLARE_RECORD_TYPE: "A"      # or AAAA
+      # CLOUDFLARE_TTL: "300"
+      # CLOUDFLARE_PROXIED: "false"
+      # DDNS_INTERVAL: "600"            # continuous update every N seconds; omit for one-shot
+      # DDNS_DRY_RUN: "false"
+
+    # Option B: External .env file (uncomment to use). If both are present, inline environment wins.
+    # env_file:
+    #   - ./.env
+
+    # Command overrides (default in Dockerfile is --verbose); omit --once if you want continuous mode.
+    command: ["--verbose"]
+
+    # Optional: Add healthcheck (simple no-op import test)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ddns,sys;sys.exit(0)"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    # Optional: Read-only filesystem (uncomment after verifying no writes needed)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
+
+# networks:
+#   default:
+#     name: cf-ddns-net
+#     driver: bridge
+
+# To run:
+#   docker compose -f docker-compose.sample.yml up -d --build
+# Logs:
+#   docker compose -f docker-compose.sample.yml logs -f ddns
+# One-shot run (override interval):
+#   docker compose -f docker-compose.sample.yml run --rm ddns --once --verbose
+
