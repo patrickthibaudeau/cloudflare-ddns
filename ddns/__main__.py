@@ -139,8 +139,10 @@ def _run_multi_loop(settings_list: List[Settings], interval: int, verbose: bool,
             return 2
     last_ips: Dict[Tuple[str, str], str] = {}
     from .ip import get_public_ip as _get_public_ip
+    iteration = 0
 
     while True:  # pragma: no cover
+        iteration += 1
         # Clear IP cache for each iteration to fetch fresh IP
         ip_cache: Dict[str, str] = {}
 
@@ -148,6 +150,20 @@ def _run_multi_loop(settings_list: List[Settings], interval: int, verbose: bool,
             if rt not in ip_cache:
                 ip_cache[rt] = _get_public_ip(rt)
             return ip_cache[rt]
+
+        # Log iteration start with IP comparison
+        if verbose:
+            record_type = settings_list[0].record_type if settings_list else "A"
+            current_ip = cached_get(record_type)
+            # Get the cached IP from the first record (they all share the same IP per record type)
+            first_key = (settings_list[0].zone_name, settings_list[0].record_name) if settings_list else None
+            cached_ip = last_ips.get(first_key) if first_key else None
+
+            if cached_ip:
+                ip_status = "unchanged" if cached_ip == current_ip else "CHANGED"
+                print(f"--- Iteration {iteration}: cached_ip={cached_ip} current_ip={current_ip} [{ip_status}] ---")
+            else:
+                print(f"--- Iteration {iteration}: current_ip={current_ip} [initial check] ---")
 
         for s in settings_list:
             key = (s.zone_name, s.record_name)
@@ -179,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             print(f"Argument error: {e}", file=sys.stderr)
             return 2
+
         # Basic validation
         for s in settings_list:
             if s.record_type not in {"A", "AAAA"}:
@@ -212,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             if settings.interval and not args.force_once:
-                run_loop(settings)
+                run_loop(settings, verbose=args.verbose)
             else:
                 result = run_once(settings)
                 if args.verbose:

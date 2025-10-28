@@ -190,6 +190,39 @@ Either set `DDNS_INTERVAL` in `.env` or pass `--interval`:
 python -m ddns --env .env --interval 300 --verbose
 ```
 
+### Continuous Update Behavior
+When running in continuous mode with an interval:
+- **First iteration**: Fetches current public IP, checks all Cloudflare records, updates only if different
+- **Subsequent iterations**: 
+  - Fetches fresh public IP each time
+  - If IP unchanged from previous check: Returns "noop" immediately (no Cloudflare API call)
+  - If IP changed: Queries Cloudflare and updates only records that differ
+  
+This minimizes API calls and only updates Cloudflare when your public IP actually changes.
+
+**Log output format (with --verbose):**
+```
+Starting DDNS updater (multi): zones=...
+--- Iteration 1: current_ip=70.49.233.249 [initial check] ---
+example.com example.com A -> noop ip=70.49.233.249 id=abc123...
+example.com home.example.com A -> noop ip=70.49.233.249 id=def456...
+--- Iteration 2: cached_ip=70.49.233.249 current_ip=70.49.233.249 [unchanged] ---
+example.com example.com A -> noop ip=70.49.233.249 id=None
+example.com home.example.com A -> noop ip=70.49.233.249 id=None
+--- Iteration 3: cached_ip=70.49.233.249 current_ip=70.49.240.100 [CHANGED] ---
+example.com example.com A -> updated ip=70.49.240.100 id=abc123...
+example.com home.example.com A -> updated ip=70.49.240.100 id=def456...
+```
+
+**Log output meanings:**
+- `--- Iteration N: ...` - Shows iteration number, cached IP, current IP, and change status
+- `[initial check]` - First run, no cached IP yet
+- `[unchanged]` - IP hasn't changed, efficient caching in effect
+- `[CHANGED]` - IP has changed, will update Cloudflare records
+- `noop ip=X.X.X.X id=<record_id>` - IP checked against Cloudflare, no change needed
+- `noop ip=X.X.X.X id=None` - IP unchanged from cache, skipped Cloudflare check (efficient)
+- `updated ip=X.X.X.X id=<record_id>` - IP changed, record updated in Cloudflare
+
 ## Override Zones / Records via CLI
 ```bash
 # Update two zones with explicit records

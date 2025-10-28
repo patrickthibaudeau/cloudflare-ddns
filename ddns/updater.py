@@ -58,14 +58,29 @@ def run_once(settings: Settings, last_ip: str | None = None, ip_getter: Callable
         return {"action": "created", "ip": current_ip, "record_id": created.get("id")}
 
 
-def run_loop(settings: Settings, sleep_fn: Callable[[int], None] = time.sleep, ip_getter: Callable[[str], str] | None = None) -> None:
+def run_loop(settings: Settings, sleep_fn: Callable[[int], None] = time.sleep, ip_getter: Callable[[str], str] | None = None, verbose: bool = False) -> None:
     if not settings.interval:
         run_once(settings, ip_getter=ip_getter)
         return
     last_ip: Optional[str] = None
+    iteration = 0
+    if ip_getter is None:
+        from .ip import get_public_ip as _get_public_ip
+        ip_getter = _get_public_ip
+
     while True:  # pragma: no cover - loop control tested indirectly
+        iteration += 1
         try:
-            result = run_once(settings, last_ip=last_ip, ip_getter=ip_getter)
+            # Get current IP for logging
+            current_ip = ip_getter(settings.record_type)
+            if verbose:
+                if last_ip:
+                    ip_status = "unchanged" if last_ip == current_ip else "CHANGED"
+                    print(f"--- Iteration {iteration}: cached_ip={last_ip} current_ip={current_ip} [{ip_status}] ---")
+                else:
+                    print(f"--- Iteration {iteration}: current_ip={current_ip} [initial check] ---")
+
+            result = run_once(settings, last_ip=last_ip, ip_getter=lambda rt: current_ip)
             last_ip = result.get("ip")
         except Exception:  # log & continue; simplistic handling
             pass
