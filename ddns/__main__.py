@@ -139,14 +139,16 @@ def _run_multi_loop(settings_list: List[Settings], interval: int, verbose: bool,
             return 2
     last_ips: Dict[Tuple[str, str], str] = {}
     from .ip import get_public_ip as _get_public_ip
-    ip_cache: Dict[str, str] = {}
-
-    def cached_get(rt: str) -> str:
-        if rt not in ip_cache:
-            ip_cache[rt] = _get_public_ip(rt)
-        return ip_cache[rt]
 
     while True:  # pragma: no cover
+        # Clear IP cache for each iteration to fetch fresh IP
+        ip_cache: Dict[str, str] = {}
+
+        def cached_get(rt: str) -> str:
+            if rt not in ip_cache:
+                ip_cache[rt] = _get_public_ip(rt)
+            return ip_cache[rt]
+
         for s in settings_list:
             key = (s.zone_name, s.record_name)
             try:
